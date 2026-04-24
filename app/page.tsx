@@ -1,16 +1,238 @@
-/**
- * Today — Sprint 1 placeholder.
- * The full dashboard (T9) arrives in Sprint 2.
- */
+"use client";
+
+import { useEffect, useState } from "react";
+import { useAnonSession } from "@/lib/auth/anon-session";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import type { MealRow } from "@/lib/supabase/types";
+import { MealCard } from "@/components/meal-card";
+import { EmptyState } from "@/components/empty-state";
+
+// ---------------------------------------------------------------------------
+// TodayPage — the primary dashboard
+//
+// Renders a newest-first vertical feed of today's meals for the signed-in
+// anonymous user. Today is filtered in the user's LOCAL timezone by building
+// midnight-to-23:59:59.999 boundaries from `new Date()` (which always uses
+// the browser's local tz when .setHours() is called without a UTC override).
+// ---------------------------------------------------------------------------
+
 export default function TodayPage() {
+  const { session, loading: sessionLoading, error: sessionError } = useAnonSession();
+  const [meals, setMeals] = useState<MealRow[] | null>(null);
+  const [queryError, setQueryError] = useState<Error | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    if (!session) return;
+
+    // ── Today filter in LOCAL timezone ───────────────────────────────────────
+    // Both Date objects are created via new Date() then mutated with setHours().
+    // setHours() operates in the local timezone, so this range is exactly
+    // "today from midnight to 23:59:59.999 in whatever tz the user's device is in."
+    // toISOString() converts to UTC for the Supabase query — correct behavior
+    // because Supabase stores UTC timestamps and the >= / <= operators compare them.
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const supabase = getSupabaseBrowserClient();
+
+    supabase
+      .from("meals")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .gte("created_at", startOfToday.toISOString())
+      .lte("created_at", endOfToday.toISOString())
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          setQueryError(error as unknown as Error);
+        } else {
+          setMeals(data ?? []);
+          setQueryError(null);
+        }
+      });
+  }, [session, retryKey]);
+
+  // ── Loading state ──────────────────────────────────────────────────────────
+  // No spinner — "Developing…" in Fraunces with a chalk-dust pulse.
+  if (sessionLoading || (session && meals === null && !queryError)) {
+    return (
+      <div
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+        }}
+      >
+        <PageHeader />
+        <div
+          style={{
+            paddingTop: "var(--space-kitchen)",
+            paddingBottom: "var(--space-kitchen)",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <span
+            style={{
+              color: "var(--fg-smoke)",
+              fontFamily:
+                "var(--font-fraunces), ui-serif, Georgia, serif",
+              fontVariationSettings:
+                "\"opsz\" 11, \"SOFT\" 100, \"wght\" 400",
+              fontSize: "13px",
+              animation: "chalkDustPulse 1.6s var(--ease-in-out) infinite",
+            }}
+          >
+            Developing…
+          </span>
+          <style>{`
+            @keyframes chalkDustPulse {
+              0%, 100% { opacity: 0.30; }
+              50%       { opacity: 0.65; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              @keyframes chalkDustPulse {
+                0%, 100% { opacity: 0.45; }
+              }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Session error ─────────────────────────────────────────────────────────
+  const activeError = sessionError ?? queryError;
+  if (activeError) {
+    return (
+      <div
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+        }}
+      >
+        <PageHeader />
+        <div
+          style={{
+            paddingLeft: "var(--space-counter)",
+            paddingRight: "var(--space-counter)",
+            paddingTop: "var(--space-shelf)",
+          }}
+        >
+          <p
+            style={{
+              color: "var(--fg-smoke)",
+              fontFamily:
+                "var(--font-fraunces), ui-serif, Georgia, serif",
+              fontVariationSettings:
+                "\"opsz\" 11, \"SOFT\" 100, \"wght\" 400",
+              fontSize: "13px",
+              lineHeight: 1.6,
+              marginBottom: "var(--space-plate)",
+            }}
+          >
+            {activeError.message}
+          </p>
+          <button
+            type="button"
+            onClick={() => setRetryKey((k) => k + 1)}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              color: "var(--fg-chalk-dust)",
+              fontFamily:
+                "var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif",
+              fontSize: "12px",
+              textDecoration: "underline",
+              textUnderlineOffset: "3px",
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── No session yet (shouldn't normally reach here but defensive) ──────────
+  if (!session) {
+    return (
+      <div style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <PageHeader />
+      </div>
+    );
+  }
+
+  // ── Empty state ───────────────────────────────────────────────────────────
+  if (meals !== null && meals.length === 0) {
+    return (
+      <div style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <PageHeader />
+        <EmptyState />
+      </div>
+    );
+  }
+
+  // ── Meal feed ─────────────────────────────────────────────────────────────
   return (
-    <div className="px-6 pt-10">
-      <h1 className="font-display text-4xl tracking-tight text-fg">
+    <div style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      <PageHeader />
+
+      {/* Contact-sheet feed — photos edge-to-edge, space-y-8 (32px) rhythm */}
+      <ul
+        role="list"
+        style={{
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-shelf)",  // 32px between cards
+        }}
+      >
+        {meals!.map((meal) => (
+          <li key={meal.id}>
+            <MealCard meal={meal} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PageHeader — "Your Diet Today" in display Fraunces
+// Generous safe-area-aware top padding.
+// ---------------------------------------------------------------------------
+function PageHeader() {
+  return (
+    <header
+      style={{
+        paddingLeft: "var(--space-counter)",
+        paddingRight: "var(--space-counter)",
+        paddingTop: "var(--space-room)",     // 40px — generous breathing room
+        paddingBottom: "var(--space-shelf)", // 32px before feed
+      }}
+    >
+      <h1
+        style={{
+          fontFamily:
+            "var(--font-fraunces), ui-serif, Georgia, serif",
+          // Display axis settings: opsz 144, SOFT 100, weight 500
+          fontVariationSettings:
+            "\"opsz\" 144, \"SOFT\" 100, \"wght\" 500",
+          fontSize: "clamp(28px, 8vw, 40px)",
+          letterSpacing: "var(--tracking-tight)",
+          lineHeight: 1.1,
+          color: "var(--fg-crema)",
+          margin: 0,
+        }}
+      >
         Your Diet Today
       </h1>
-      <p className="mt-3 text-fg-muted text-sm font-body">
-        Snap a meal to get started.
-      </p>
-    </div>
+    </header>
   );
 }
