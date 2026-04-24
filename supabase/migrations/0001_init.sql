@@ -65,6 +65,7 @@ create index if not exists meals_user_category_created_idx
 alter table public.meals enable row level security;
 
 -- Policy: users may only see and modify their own rows
+drop policy if exists meals_owner on public.meals;
 create policy meals_owner
   on public.meals
   for all
@@ -92,6 +93,7 @@ create table if not exists public.push_subs (
 );
 
 -- Trigger: auto-stamp updated_at on every UPDATE
+drop trigger if exists push_subs_set_updated_at on public.push_subs;
 create trigger push_subs_set_updated_at
   before update on public.push_subs
   for each row
@@ -101,6 +103,7 @@ create trigger push_subs_set_updated_at
 alter table public.push_subs enable row level security;
 
 -- Policy: users may only see and modify their own subscription row
+drop policy if exists push_subs_owner on public.push_subs;
 create policy push_subs_owner
   on public.push_subs
   for all
@@ -124,6 +127,7 @@ create policy push_subs_owner
 -- ---------------------------------------------------------------------------
 
 -- SELECT: users can read only their own objects
+drop policy if exists "meal_photos_select_owner" on storage.objects;
 create policy "meal_photos_select_owner"
   on storage.objects
   for select
@@ -133,6 +137,7 @@ create policy "meal_photos_select_owner"
   );
 
 -- INSERT: users can upload only into their own prefix
+drop policy if exists "meal_photos_insert_owner" on storage.objects;
 create policy "meal_photos_insert_owner"
   on storage.objects
   for insert
@@ -142,6 +147,7 @@ create policy "meal_photos_insert_owner"
   );
 
 -- DELETE: users can delete only their own objects (needed for re-categorize + delete flows)
+drop policy if exists "meal_photos_delete_owner" on storage.objects;
 create policy "meal_photos_delete_owner"
   on storage.objects
   for delete
