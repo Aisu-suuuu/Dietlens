@@ -1,1 +1,105 @@
 @import "tailwindcss";
+@import "../styles/tokens.css";
+
+@theme {
+  /* ── Colors ─────────────────────────────────────────────── */
+  /* Foreground */
+  --color-fg: var(--fg-primary);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-tertiary: var(--fg-tertiary);
+  --color-fg-muted: var(--fg-muted);
+
+  /* Foreground named */
+  --color-crema: var(--fg-crema);
+  --color-thermal-paper: var(--fg-thermal-paper);
+  --color-chalk-dust: var(--fg-chalk-dust);
+  --color-smoke: var(--fg-smoke);
+
+  /* Backgrounds / surfaces */
+  --color-bg: var(--bg-canvas);
+  --color-bg-elev-1: var(--bg-elev-1);
+  --color-bg-elev-2: var(--bg-elev-2);
+  --color-bg-elev-3: var(--bg-elev-3);
+  --color-bg-input: var(--bg-mise-en-place);
+
+  /* Borders */
+  --color-border: var(--border-default);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-emphasis: var(--border-emphasis);
+  --color-focus-ring: var(--focus-ring);
+
+  /* Brand */
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-press: var(--brand-press);
+
+  /* Semantic */
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
+  --color-success: var(--success);
+
+  /* Control */
+  --color-control: var(--control-bg);
+  --color-control-hover: var(--control-bg-hover);
+
+  /* Signature */
+  --color-tape-surface: var(--tape-surface);
+  --color-tape-ink: var(--tape-ink);
+
+  /* ── Typography ──────────────────────────────────────────── */
+  /* Variable names must match what next/font injects:
+     --font-fraunces, --font-inter-tight, --font-jetbrains-mono
+     The tokens.css stacks reference --font-fraunces / --font-inter / --font-jetbrains;
+     these @theme keys expose them under Tailwind utility names. */
+  --font-display: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
+  --font-body: var(--font-inter-tight), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* ── Radius ──────────────────────────────────────────────── */
+  --radius-sm: var(--radius-tape);
+  --radius-md: var(--radius-knob);
+  --radius-lg: var(--radius-polaroid);
+  --radius-full: var(--radius-shutter);
+
+  /* ── Spacing ─────────────────────────────────────────────── */
+  --spacing-crumb: var(--space-crumb);
+  --spacing-bite: var(--space-bite);
+  --spacing-sip: var(--space-sip);
+  --spacing-plate: var(--space-plate);
+  --spacing-tray: var(--space-tray);
+  --spacing-counter: var(--space-counter);
+  --spacing-shelf: var(--space-shelf);
+  --spacing-room: var(--space-room);
+  --spacing-kitchen: var(--space-kitchen);
+  --spacing-hall: var(--space-hall);
+
+  /* ── Motion ──────────────────────────────────────────────── */
+  --ease-shutter: var(--ease-shutter);
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+
+  --duration-fast: var(--dur-fast);
+  --duration-normal: var(--dur-normal);
+  --duration-slow: var(--dur-slow);
+}
+
+/* ── Base element styles ────────────────────────────────────── */
+html {
+  color-scheme: dark;
+  /* Respect iPhone notch / Dynamic Island */
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    0
+    env(safe-area-inset-left);
+}
+
+body {
+  background: var(--bg-canvas);
+  color: var(--fg-primary);
+  font-family: var(--font-inter-tight), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Bottom safe area handled per-element (nav + content) so
+     the background extends edge-to-edge under the home indicator. */
+}
