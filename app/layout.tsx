@@ -6,6 +6,7 @@ import { SwRegister } from "@/components/sw-register";
 import { BottomNav } from "@/components/bottom-nav";
 import { Fab } from "@/components/fab";
 import { ToastHost } from "@/components/toast";
+import { OfflineBanner } from "@/components/offline-banner";
 import "./globals.css";
 
 // ── Fonts ────────────────────────────────────────────────────────────────────
@@ -47,6 +48,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Client-only bootstraps — both render null, side-effects only */}
         <SwRegister />
         <SessionBootstrap />
+
+        {/*
+          Offline/queue banner — fixed to the top of the viewport; slides in
+          when offline or while a drain is in progress. Mounted ABOVE the
+          main shell so it sits over the header content rather than pushing
+          the layout down.
+        */}
+        <OfflineBanner />
 
         <div className="min-h-[100dvh] flex flex-col">
           {/* Main content area: leaves space for fixed bottom nav + safe area */}

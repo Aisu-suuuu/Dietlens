@@ -50,8 +50,59 @@ export default function TodayPage() {
       setMeals((prev) => (prev ? [newMeal, ...prev] : [newMeal]));
     }
 
+    function handleMealDeleted(e: Event) {
+      const { mealId } = (e as CustomEvent<{ mealId: string }>).detail;
+      setMeals((prev) => (prev ? prev.filter((m) => m.id !== mealId) : prev));
+    }
+
+    function handleMealUpdated(e: Event) {
+      const { mealId, updates } = (e as CustomEvent<{ mealId: string; updates: Partial<MealRow> }>).detail;
+      setMeals((prev) => (prev ? prev.map((m) => (m.id === mealId ? { ...m, ...updates } : m)) : prev));
+    }
+
+    // ── meal:synced — swap an optimistic (offline) placeholder for the
+    // server-authoritative row. The sync module fires this after a queued
+    // meal has successfully been uploaded AND inserted.
+    //
+    // We update in place (no re-order) because the optimistic row was
+    // prepended at offline-capture time; the user expects it to stay where
+    // it is on the feed and just lose its "Queued" badge.
+    function handleMealSynced(e: Event) {
+      const detail = (e as CustomEvent<{
+        localId: string;
+        mealId: string;
+        path: string;
+        createdAt: string;
+        category: MealRow["category"];
+      }>).detail;
+      if (!detail?.localId || !detail?.mealId) return;
+
+      setMeals((prev) => {
+        if (!prev) return prev;
+        return prev.map((m) =>
+          m.id === detail.localId
+            ? {
+                ...m,
+                id: detail.mealId,
+                image_path: detail.path,
+                category: detail.category,
+                created_at: detail.createdAt,
+              }
+            : m
+        );
+      });
+    }
+
     window.addEventListener("meal:created", handleMealCreated);
-    return () => window.removeEventListener("meal:created", handleMealCreated);
+    window.addEventListener("meal:deleted", handleMealDeleted);
+    window.addEventListener("meal:updated", handleMealUpdated);
+    window.addEventListener("meal:synced", handleMealSynced);
+    return () => {
+      window.removeEventListener("meal:created", handleMealCreated);
+      window.removeEventListener("meal:deleted", handleMealDeleted);
+      window.removeEventListener("meal:updated", handleMealUpdated);
+      window.removeEventListener("meal:synced", handleMealSynced);
+    };
   }, [session]);
 
   useEffect(() => {

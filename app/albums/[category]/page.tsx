@@ -263,9 +263,68 @@ export default function AlbumDetailPage() {
       );
     }
 
+    function handleMealUpdated(e: Event) {
+      const { mealId, updates } = (e as CustomEvent<{ mealId: string; updates: Partial<MealRow> }>).detail;
+      if (!mealId || !updates) return;
+
+      // If the meal moved OUT of this album's category, remove it.
+      // (Re-categorizing INTO this album from elsewhere requires a full MealRow
+      // we don't have on the event — a natural fix is to re-fetch next visit.
+      // Acceptable for MVP: the user just moved a card away and likely returns
+      // to Albums → taps the destination category to confirm.)
+      if (updates.category && updates.category !== category) {
+        setMeals((prev) => (prev ? prev.filter((m) => m.id !== mealId) : prev));
+      }
+    }
+
+    // ── meal:synced — swap optimistic (offline) placeholder for server row.
+    // Fires when a queued meal lands in the DB. Same category-fence as the
+    // meal:created handler: we only care about meals that belong here. If
+    // sync somehow assigned a different category (shouldn't — the queue
+    // carries the original category verbatim), treat it as a move-out and
+    // drop the card.
+    function handleMealSynced(e: Event) {
+      const detail = (e as CustomEvent<{
+        localId: string;
+        mealId: string;
+        path: string;
+        createdAt: string;
+        category: Category;
+      }>).detail;
+      if (!detail?.localId || !detail?.mealId) return;
+
+      if (detail.category !== category) {
+        setMeals((prev) =>
+          prev ? prev.filter((m) => m.id !== detail.localId) : prev
+        );
+        return;
+      }
+
+      setMeals((prev) => {
+        if (!prev) return prev;
+        return prev.map((m) =>
+          m.id === detail.localId
+            ? {
+                ...m,
+                id: detail.mealId,
+                image_path: detail.path,
+                category: detail.category,
+                created_at: detail.createdAt,
+              }
+            : m
+        );
+      });
+    }
+
     window.addEventListener("meal:deleted", handleMealDeleted);
-    return () => window.removeEventListener("meal:deleted", handleMealDeleted);
-  }, []);
+    window.addEventListener("meal:updated", handleMealUpdated);
+    window.addEventListener("meal:synced", handleMealSynced);
+    return () => {
+      window.removeEventListener("meal:deleted", handleMealDeleted);
+      window.removeEventListener("meal:updated", handleMealUpdated);
+      window.removeEventListener("meal:synced", handleMealSynced);
+    };
+  }, [category]);
 
   // ── Loading state ─────────────────────────────────────────────────────────
   if (sessionLoading || (session && meals === null && !queryError)) {
