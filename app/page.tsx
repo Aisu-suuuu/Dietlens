@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAnonSession } from "@/lib/auth/anon-session";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { MealRow } from "@/lib/supabase/types";
+import type { CaptureResult } from "@/lib/upload/capture";
 import { MealCard } from "@/components/meal-card";
 import { EmptyState } from "@/components/empty-state";
 
@@ -21,6 +22,37 @@ export default function TodayPage() {
   const [meals, setMeals] = useState<MealRow[] | null>(null);
   const [queryError, setQueryError] = useState<Error | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+
+  // ── Optimistic prepend on meal:created ────────────────────────────────────
+  // Listen for the CustomEvent dispatched by <Fab /> after a successful upload.
+  //
+  // Strategy: window event (not Supabase Realtime).
+  //   - Simpler for MVP — no realtime subscription to manage or teardown.
+  //   - Instant: the event fires synchronously after the DB insert succeeds, so
+  //     the UI updates on the same tick without a round-trip re-query.
+  //   - Supabase Realtime is the better long-term solution (multi-tab, offline
+  //     sync) but adds a websocket subscription, quota, and teardown complexity
+  //     that isn't worth it for a single-user local-first MVP.
+  useEffect(() => {
+    function handleMealCreated(e: Event) {
+      const detail = (e as CustomEvent<CaptureResult>).detail;
+      if (!detail?.mealId) return;
+
+      const newMeal: MealRow = {
+        id: detail.mealId,
+        user_id: session?.user?.id ?? "",
+        image_path: detail.imagePath,
+        category: detail.category,
+        created_at: detail.createdAt,
+      };
+
+      // Prepend to the list — newest-first order matches the query sort.
+      setMeals((prev) => (prev ? [newMeal, ...prev] : [newMeal]));
+    }
+
+    window.addEventListener("meal:created", handleMealCreated);
+    return () => window.removeEventListener("meal:created", handleMealCreated);
+  }, [session]);
 
   useEffect(() => {
     if (!session) return;

@@ -1,32 +1,48 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { CategorySheet } from "./category-sheet";
+import { showToast } from "./toast";
+import { captureAndUploadMeal } from "@/lib/upload/capture";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useAnonSession } from "@/lib/auth/anon-session";
 import type { Category } from "@/lib/supabase/types";
 
+/**
+ * Fab — shutter-ring FAB wired to the full meal capture pipeline.
+ *
+ * Flow:
+ *   1. User taps FAB → CategorySheet opens
+ *   2. User picks a category → category stored in ref, file input clicked
+ *   3. Camera/picker opens → user selects photo
+ *   4. File runs through captureAndUploadMeal (compress → upload → insert)
+ *   5. Success: toast + haptic + `meal:created` CustomEvent dispatched on window
+ *   6. Error: toast + console.error
+ *
+ * The `onCategorySelected` prop is kept as optional for test/storybook use,
+ * but default behavior is the internal capture pipeline.
+ */
 export interface FabProps {
+  /** Optional override — called instead of the capture pipeline when provided. */
   onCategorySelected?: (category: Category) => void;
 }
 
-/**
- * Fab — the shutter-ring FAB.
- *
- * Design mandate (system.md §4 + T2 direction):
- * - Bottom-center, not bottom-right. Thumb-reach when the other hand is occupied.
- * - A double-ring outlined circle in safelight amber (--shutter-ring). NO plus icon.
- * - On press: inner ring scales inward (shutter closing), 380ms ease-shutter.
- * - Sits at z-50 (BottomNav is z-40). Floats 12px above nav (56px tall + safe-area).
- * - 64px outer diameter, meets 44px minimum tap-target.
- * - Haptic: navigator.vibrate(25) on click (optional, best-effort).
- *
- * Integration note: layout mounting is T12's responsibility (Wave 2 capture flow).
- */
 export function Fab({ onCategorySelected }: FabProps) {
   const [open, setOpen] = useState(false);
   const [pressing, setPressing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
   const fabRef = useRef<HTMLButtonElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Store the pending category between sheet-selection and file-pick
+  const pendingCategoryRef = useRef<Category | null>(null);
+
+  const { userId } = useAnonSession();
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
 
   function handleOpen() {
+    if (uploading) return;
     navigator.vibrate?.(25);
     setOpen(true);
   }
@@ -43,20 +59,114 @@ export function Fab({ onCategorySelected }: FabProps) {
     setPressing(false);
   }
 
+  const handleCategorySelected = useCallback(
+    (category: Category) => {
+      setOpen(false);
+
+      // If a custom override is provided, call it and stop here.
+      if (onCategorySelected) {
+        onCategorySelected(category);
+        return;
+      }
+
+      if (!userId) {
+        showToast({ message: "Not signed in — please wait a moment", icon: "error" });
+        return;
+      }
+
+      pendingCategoryRef.current = category;
+      // Programmatically open the native camera/file picker
+      fileInputRef.current?.click();
+    },
+    [onCategorySelected, userId]
+  );
+
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+
+      // ── User cancelled the picker — silent, do nothing ───────────────────
+      if (!file) return;
+
+      // Reset the input so the same file can be selected again later
+      e.target.value = "";
+
+      const category = pendingCategoryRef.current;
+      if (!category) {
+        console.error("[Fab] file selected but no pending category");
+        return;
+      }
+
+      if (!userId) {
+        showToast({ message: "Not signed in — try again", icon: "error" });
+        return;
+      }
+
+      setUploading(true);
+
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const result = await captureAndUploadMeal({ file, category, userId, supabase });
+
+        // ── Success ─────────────────────────────────────────────────────────
+        navigator.vibrate?.(50);
+        showToast({ message: `Logged to ${result.category}`, icon: "check" });
+
+        // Dispatch window event so the dashboard can prepend the new meal
+        window.dispatchEvent(
+          new CustomEvent("meal:created", { detail: result })
+        );
+      } catch (err: unknown) {
+        // ── Error ────────────────────────────────────────────────────────────
+        console.error("[Fab] capture error:", err);
+
+        // Surface HEIC-specific message verbatim from compressImage
+        const msg =
+          err instanceof Error && err.message.includes("HEIC")
+            ? "Set iPhone camera to 'Most Compatible' in Settings → Camera → Formats"
+            : "Couldn't save — try again";
+
+        showToast({ message: msg, icon: "error", duration: 4000 });
+      } finally {
+        setUploading(false);
+        pendingCategoryRef.current = null;
+      }
+    },
+    [userId]
+  );
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <>
       {/*
+        Hidden file input — accept images, prefer rear camera (capture="environment").
+        Kept in the DOM but never visible.
+      */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ position: "absolute", width: 0, height: 0, opacity: 0, pointerEvents: "none" }}
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={handleFileChange}
+      />
+
+      {/*
         Position: fixed, bottom-center.
         Bottom offset = safe-area + nav height (56px) + gap (12px) + FAB radius (32px)
-        so the FAB's center sits 12px above the top of the nav.
-        -translate-x-1/2 + left-1/2 = horizontal center.
+        so the FAB's centre sits 12px above the top of the nav.
+        -translate-x-1/2 + left-1/2 = horizontal centre.
       */}
       <button
         ref={fabRef}
         type="button"
-        aria-label="Log a meal"
+        aria-label={uploading ? "Uploading meal…" : "Log a meal"}
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-busy={uploading}
         onClick={handleOpen}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
@@ -80,7 +190,8 @@ export function Fab({ onCategorySelected }: FabProps) {
           borderRadius: "var(--radius-shutter)",
           // Shutter core: cast-iron canvas so the rings are visible against it
           background: "var(--shutter-core)",
-          cursor: "pointer",
+          cursor: uploading ? "wait" : "pointer",
+          opacity: uploading ? 0.65 : 1,
           // Ambient glow: softlight halo when not pressed
           boxShadow: pressing
             ? `0 0 0 0 var(--shutter-glow)`
@@ -88,7 +199,8 @@ export function Fab({ onCategorySelected }: FabProps) {
           // Outer scale: subtle shrink on press (the ring closing)
           transition: `
             box-shadow var(--dur-fast) var(--ease-shutter),
-            transform var(--dur-fast) var(--ease-shutter)
+            transform var(--dur-fast) var(--ease-shutter),
+            opacity var(--dur-normal) var(--ease-out)
           `,
           // Touch — prevent double-tap zoom on mobile
           touchAction: "manipulation",
@@ -99,25 +211,20 @@ export function Fab({ onCategorySelected }: FabProps) {
         }}
       >
         {/* Shutter-ring SVG — two concentric stroked circles, no fill, no plus */}
-        <ShutterRingSvg pressing={pressing} />
-
-        {/* Focus ring via :focus-visible (CSS-in-JS below handles it) */}
+        <ShutterRingSvg pressing={pressing} uploading={uploading} />
       </button>
 
       <CategorySheet
         open={open}
         onClose={() => setOpen(false)}
-        onSelect={(category) => {
-          setOpen(false);
-          onCategorySelected?.(category);
-        }}
+        onSelect={handleCategorySelected}
         triggerRef={fabRef}
       />
 
       {/*
         Keyframes scoped to this component.
         shutterPulse: the inner ring scales down briefly then recovers — like a shutter blade closing.
-        Triggered by .fab-pressing class added via React state.
+        uploadPulse: gentle opacity throb while uploading.
       */}
       <style>{`
         .fab-btn:focus-visible {
@@ -149,10 +256,23 @@ export function Fab({ onCategorySelected }: FabProps) {
           transform: scale(0.94);
         }
 
+        .shutter-inner--uploading {
+          animation: uploadPulse 1.2s var(--ease-in-out) infinite;
+        }
+
+        @keyframes uploadPulse {
+          0%, 100% { opacity: 0.4; }
+          50%       { opacity: 1.0; }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .shutter-inner,
           .shutter-outer {
             transition: none;
+          }
+          .shutter-inner--uploading {
+            animation: none;
+            opacity: 0.7;
           }
         }
       `}</style>
@@ -165,14 +285,31 @@ export function Fab({ onCategorySelected }: FabProps) {
 //   outer: r=28, stroke 1.5px at 40% opacity — the "aperture housing"
 //   inner: r=21, stroke 2px at 90% opacity — the "aperture blades"
 // On press: inner scales to 0.62 (blades closing), outer scales to 0.94 (housing contracts).
+// On upload: inner throbs gently.
 // Color: --shutter-ring (var(--safelight) amber).
 // NO fill, NO plus icon, NO camera icon.
 
 interface ShutterRingSvgProps {
   pressing: boolean;
+  uploading: boolean;
 }
 
-function ShutterRingSvg({ pressing }: ShutterRingSvgProps) {
+function ShutterRingSvg({ pressing, uploading }: ShutterRingSvgProps) {
+  const innerClass = [
+    "shutter-inner",
+    pressing ? "shutter-inner--pressing" : "",
+    uploading ? "shutter-inner--uploading" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const outerClass = [
+    "shutter-outer",
+    pressing ? "shutter-outer--pressing" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <svg
       viewBox="0 0 64 64"
@@ -191,7 +328,7 @@ function ShutterRingSvg({ pressing }: ShutterRingSvgProps) {
         stroke="var(--shutter-ring)"
         strokeWidth="1.5"
         strokeOpacity="0.40"
-        className={`shutter-outer${pressing ? " shutter-outer--pressing" : ""}`}
+        className={outerClass}
       />
       {/* Inner ring: aperture blades — this is the one that pulses inward */}
       <circle
@@ -202,11 +339,11 @@ function ShutterRingSvg({ pressing }: ShutterRingSvgProps) {
         stroke="var(--shutter-ring)"
         strokeWidth="2"
         strokeOpacity="0.90"
-        className={`shutter-inner${pressing ? " shutter-inner--pressing" : ""}`}
+        className={innerClass}
       />
       {/*
-        Micro center dot — the shutter's focal point.
-        2px radius filled, same safelight color at 60% opacity.
+        Micro centre dot — the shutter's focal point.
+        2px radius filled, same safelight colour at 60% opacity.
         NOT a plus icon — it is the aperture's vanishing point.
       */}
       <circle

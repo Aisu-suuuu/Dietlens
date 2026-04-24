@@ -4,6 +4,8 @@ import { appMetadata, appViewport } from "@/lib/metadata";
 import SessionBootstrap from "@/components/session-bootstrap";
 import { SwRegister } from "@/components/sw-register";
 import { BottomNav } from "@/components/bottom-nav";
+import { Fab } from "@/components/fab";
+import { ToastHost } from "@/components/toast";
 import "./globals.css";
 
 // ── Fonts ────────────────────────────────────────────────────────────────────
@@ -53,6 +55,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </main>
 
           <BottomNav />
+          <Fab />
+          <ToastHost />
         </div>
       </body>
     </html>
