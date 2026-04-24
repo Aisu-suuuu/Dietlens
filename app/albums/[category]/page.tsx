@@ -205,6 +205,12 @@ export default function AlbumDetailPage() {
   useEffect(() => {
     if (!session) return;
 
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setMeals((prev) => prev ?? []);
+      setQueryError(null);
+      return;
+    }
+
     const supabase = getSupabaseBrowserClient();
 
     supabase
@@ -219,6 +225,14 @@ export default function AlbumDetailPage() {
         } else {
           setMeals(data ?? []);
           setQueryError(null);
+        }
+      })
+      .catch((err) => {
+        if (err instanceof TypeError && err.message.includes("fetch")) {
+          setMeals((prev) => prev ?? []);
+          setQueryError(null);
+        } else {
+          setQueryError(err as Error);
         }
       });
   }, [session, category]);

@@ -108,12 +108,16 @@ export default function TodayPage() {
   useEffect(() => {
     if (!session) return;
 
+    // If the browser is offline, don't attempt the fetch — show empty feed so
+    // the offline banner + capture flow stay usable. Queued meals still render
+    // via the meal:created event path.
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setMeals((prev) => prev ?? []);
+      setQueryError(null);
+      return;
+    }
+
     // ── Today filter in LOCAL timezone ───────────────────────────────────────
-    // Both Date objects are created via new Date() then mutated with setHours().
-    // setHours() operates in the local timezone, so this range is exactly
-    // "today from midnight to 23:59:59.999 in whatever tz the user's device is in."
-    // toISOString() converts to UTC for the Supabase query — correct behavior
-    // because Supabase stores UTC timestamps and the >= / <= operators compare them.
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
@@ -136,8 +140,28 @@ export default function TodayPage() {
           setMeals(data ?? []);
           setQueryError(null);
         }
+      })
+      .catch((err) => {
+        // Network-level failure (TypeError: Failed to fetch) — treat as
+        // transient offline rather than a hard error. The offline banner
+        // already tells the user what's up.
+        if (err instanceof TypeError && err.message.includes("fetch")) {
+          setMeals((prev) => prev ?? []);
+          setQueryError(null);
+        } else {
+          setQueryError(err as Error);
+        }
       });
   }, [session, retryKey]);
+
+  // Re-run the query automatically when the browser comes back online.
+  useEffect(() => {
+    function handleOnline() {
+      setRetryKey((k) => k + 1);
+    }
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, []);
 
   // ── Loading state ──────────────────────────────────────────────────────────
   // No spinner — "Developing…" in Fraunces with a chalk-dust pulse.
