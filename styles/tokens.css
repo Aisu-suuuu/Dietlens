@@ -1,0 +1,261 @@
+/* ============================================================
+   DietLens — Design Tokens
+   Zero-friction food-logging PWA. Dark-first.
+   Read `.interface-design/system.md` for rationale behind
+   every name and value in this file.
+   ============================================================ */
+
+:root {
+  /* ----------------------------------------------------------
+     FOREGROUND — text on cast-iron
+     Crema leads, thermal-paper supports, chalk-dust recedes,
+     smoke disappears.
+     ---------------------------------------------------------- */
+  --fg-crema:          #E8C79A;            /* primary — espresso foam */
+  --fg-thermal-paper:  #F2EBDD;            /* secondary — fresh receipt */
+  --fg-chalk-dust:     #9A948A;            /* tertiary — erased chalk */
+  --fg-smoke:          #615B53;            /* muted / disabled — old herb */
+
+  /* Semantic aliases (legacy naming, for code that prefers them) */
+  --fg-primary:        var(--fg-crema);
+  --fg-secondary:      var(--fg-thermal-paper);
+  --fg-tertiary:       var(--fg-chalk-dust);
+  --fg-muted:          var(--fg-smoke);
+
+  /* ----------------------------------------------------------
+     SURFACE — seasoned cast-iron, stacked
+     Warm black canvas rising to skillet-edge at the top
+     elevation. 2-4% lightness per step. Tints, not shadows.
+     ---------------------------------------------------------- */
+  --bg-cast-iron:      #0E0B0A;            /* canvas — pan on low heat */
+  --bg-stove-black:    #151211;            /* elev 1 — deeper in the pan */
+  --bg-ember-black:    #1C1816;            /* elev 2 — coals beneath */
+  --bg-skillet-edge:   #262220;            /* elev 3 — handle of the pan */
+
+  /* Inputs are INSET — darker than their container (bowl receiving pour) */
+  --bg-mise-en-place:  #0A0807;            /* input background — deeper than canvas */
+
+  /* Semantic aliases */
+  --bg-canvas:         var(--bg-cast-iron);
+  --bg-elev-1:         var(--bg-stove-black);
+  --bg-elev-2:         var(--bg-ember-black);
+  --bg-elev-3:         var(--bg-skillet-edge);
+
+  /* ----------------------------------------------------------
+     BORDER — crema-grain, never cold lines
+     All borders are the same warm hue; intensity varies by alpha.
+     ---------------------------------------------------------- */
+  --border-grain:      rgba(232, 199, 154, 0.06);   /* subtle — barely there */
+  --border-crumb:      rgba(232, 199, 154, 0.10);   /* default — visible structure */
+  --border-ember:      rgba(232, 199, 154, 0.18);   /* emphasis — card hover */
+  --border-safelight:  rgba(224, 123, 58, 0.65);    /* focus ring — darkroom amber */
+
+  /* Semantic aliases */
+  --border-subtle:     var(--border-grain);
+  --border-default:    var(--border-crumb);
+  --border-emphasis:   var(--border-ember);
+  --focus-ring:        var(--border-safelight);
+
+  /* ----------------------------------------------------------
+     BRAND — darkroom safelight
+     One warm amber, used for the shutter FAB ring and the
+     single accent that announces "something important."
+     ---------------------------------------------------------- */
+  --safelight:         #E07B3A;            /* brand */
+  --safelight-warm:    #F39457;            /* brand hover — lamp flared */
+  --safelight-deep:    #B85E27;            /* brand press — lamp dimmed */
+
+  /* Semantic aliases */
+  --brand:             var(--safelight);
+  --brand-hover:       var(--safelight-warm);
+  --brand-press:       var(--safelight-deep);
+
+  /* ----------------------------------------------------------
+     SEMANTIC — tastes of danger, warning, success
+     ---------------------------------------------------------- */
+  --smoked-brick:      #7E3324;            /* destructive — charred tomato */
+  --honey-dark:        #B8862A;            /* warning — aged honey */
+  --scorched-green:    #5B7051;            /* success — blanched scallion (the one cold accent) */
+
+  --danger:            var(--smoked-brick);
+  --warn:              var(--honey-dark);
+  --success:           var(--scorched-green);
+
+  /* ----------------------------------------------------------
+     CONTROL — form fields, buttons, interactive surfaces
+     Separate from layout surfaces so inputs can be tuned
+     independently.
+     ---------------------------------------------------------- */
+  --control-bg:        var(--bg-mise-en-place);
+  --control-bg-hover:  #100D0C;
+  --control-border:    rgba(242, 235, 221, 0.08);
+  --control-ring:      rgba(224, 123, 58, 0.35);
+
+  /* ----------------------------------------------------------
+     SIGNATURE — the masking-tape label
+     Thermal-paper cream with a tiny inner shadow tint.
+     ---------------------------------------------------------- */
+  --tape-surface:      #F2EBDD;
+  --tape-ink:          #2A2320;            /* Fraunces ink on tape */
+  --tape-shadow:       rgba(0, 0, 0, 0.28); /* the 'stuck' edge */
+  --tape-tilt:         0.8deg;             /* hand-rotation */
+
+  /* The shutter FAB */
+  --shutter-ring:      var(--safelight);
+  --shutter-core:      var(--bg-cast-iron);
+  --shutter-glow:      rgba(224, 123, 58, 0.22);
+
+  /* The chalked timestamp — crema at partial opacity */
+  --chalk-ink:         rgba(232, 199, 154, 0.62);
+
+  /* ----------------------------------------------------------
+     MOTION — shutters don't bounce
+     ---------------------------------------------------------- */
+  --ease-out:          cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out:       cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-shutter:      cubic-bezier(0.4, 0, 0.15, 1);
+
+  --dur-fast:          140ms;
+  --dur-normal:        220ms;
+  --dur-slow:          380ms;
+
+  /* ----------------------------------------------------------
+     RADIUS — tight, kitchen-tight
+     ---------------------------------------------------------- */
+  --radius-tape:       2px;                /* masking tape, chips */
+  --radius-knob:       6px;                /* inputs, buttons */
+  --radius-polaroid:   10px;               /* meal cards, album tiles */
+  --radius-shutter:    9999px;             /* FAB ring only */
+
+  /* Semantic aliases */
+  --radius-sm:         var(--radius-tape);
+  --radius-md:         var(--radius-knob);
+  --radius-lg:         var(--radius-polaroid);
+
+  /* ----------------------------------------------------------
+     SPACING — named after what each gap feels like in a kitchen
+     Base unit: 4px. Scale: 4, 8, 12, 16, 20, 24, 32, 40, 56, 72, 96
+     ---------------------------------------------------------- */
+  --space-crumb:       4px;                /* icon-to-label */
+  --space-bite:        8px;                /* chip padding */
+  --space-sip:         12px;               /* within a card */
+  --space-plate:       16px;               /* card padding */
+  --space-tray:        20px;               /* card-to-card */
+  --space-counter:     24px;               /* section padding */
+  --space-shelf:       32px;               /* between sections */
+  --space-room:        40px;               /* major breaks */
+  --space-kitchen:     56px;               /* empty-state air */
+  --space-hall:        72px;               /* hero spacing */
+  --space-banquet:     96px;               /* reserved — unlikely needed */
+
+  /* Numeric-scale aliases (for tools/agents expecting space-1..12) */
+  --space-1:           var(--space-crumb);
+  --space-2:           var(--space-bite);
+  --space-3:           var(--space-sip);
+  --space-4:           var(--space-plate);
+  --space-5:           var(--space-tray);
+  --space-6:           var(--space-counter);
+  --space-7:           var(--space-shelf);
+  --space-8:           var(--space-room);
+  --space-9:           var(--space-kitchen);
+  --space-10:          var(--space-hall);
+  --space-11:          var(--space-banquet);
+  --space-12:          var(--space-banquet);
+
+  /* Minimum hit-target (thumb on phone, low light) */
+  --hit-target:        44px;
+
+  /* ----------------------------------------------------------
+     TYPOGRAPHY
+     Fonts are assigned in app/layout.tsx via next/font and
+     exposed as --font-fraunces / --font-inter / --font-mono.
+     This file provides the stacks and tracking.
+     ---------------------------------------------------------- */
+  --font-sans:         var(--font-fraunces),
+                       ui-serif,
+                       Georgia,
+                       "Times New Roman",
+                       serif;
+  --font-ui:           var(--font-inter),
+                       ui-sans-serif,
+                       system-ui,
+                       -apple-system,
+                       "Segoe UI",
+                       sans-serif;
+  --font-mono:         var(--font-jetbrains),
+                       ui-monospace,
+                       "SF Mono",
+                       Menlo,
+                       monospace;
+
+  --tracking-tight:    -0.02em;            /* Fraunces headlines */
+  --tracking-normal:   0em;
+  --tracking-wide:     0.06em;             /* small-caps category text */
+
+  /* Fraunces variable axes — used via font-variation-settings */
+  --fraunces-headline: "opsz" 144, "SOFT" 100, "wght" 500;
+  --fraunces-label:    "opsz" 24,  "SOFT" 50,  "wght" 500;
+  --fraunces-chalk:    "opsz" 11,  "SOFT" 100, "wght" 400;
+}
+
+/* ==============================================================
+   LIGHT MODE — not a parity mode, just a paper-daylight fallback
+   for users who force-light their OS. Warm paper inverts the
+   register without betraying the palette.
+   ============================================================== */
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Foreground inverts to tape-ink hierarchy */
+    --fg-crema:          #2A2320;            /* primary — receipt ink */
+    --fg-thermal-paper:  #4A3F38;            /* secondary — softer ink */
+    --fg-chalk-dust:     #7A6E63;            /* tertiary */
+    --fg-smoke:          #A89D92;            /* muted */
+
+    /* Surfaces become warm paper, stacked lighter-on-lighter */
+    --bg-cast-iron:      #F6EFE1;            /* canvas — thermal paper */
+    --bg-stove-black:    #FBF4E6;            /* elev 1 */
+    --bg-ember-black:    #FFFAF0;            /* elev 2 */
+    --bg-skillet-edge:   #FFFFFA;            /* elev 3 */
+    --bg-mise-en-place:  #EDE5D5;            /* input — deeper paper */
+
+    /* Borders darken to visible-on-paper without going harsh */
+    --border-grain:      rgba(42, 35, 32, 0.06);
+    --border-crumb:      rgba(42, 35, 32, 0.10);
+    --border-ember:      rgba(42, 35, 32, 0.18);
+    --border-safelight:  rgba(184, 94, 39, 0.65);
+
+    /* Brand stays amber but deepens slightly for paper contrast */
+    --safelight:         #C5642A;
+    --safelight-warm:    #D87739;
+    --safelight-deep:    #9D4E1E;
+
+    /* Semantics darken similarly */
+    --smoked-brick:      #6B2A1E;
+    --honey-dark:        #8F6620;
+    --scorched-green:    #4A5D43;
+
+    /* Control surfaces */
+    --control-bg:        #EDE5D5;
+    --control-bg-hover:  #E5DBC8;
+    --control-border:    rgba(42, 35, 32, 0.10);
+    --control-ring:      rgba(197, 100, 42, 0.35);
+
+    /* Signature surfaces — tape flips to warm-cream on paper */
+    --tape-surface:      #2A2320;
+    --tape-ink:          #F2EBDD;
+    --tape-shadow:       rgba(0, 0, 0, 0.15);
+
+    --shutter-core:      var(--bg-cast-iron);
+    --shutter-glow:      rgba(197, 100, 42, 0.22);
+    --chalk-ink:         rgba(42, 35, 32, 0.55);
+  }
+}
+
+/* Respect motion preference — collapse durations, keep opacity */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast:   1ms;
+    --dur-normal: 1ms;
+    --dur-slow:   1ms;
+  }
+}

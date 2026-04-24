@@ -1,0 +1,139 @@
+<!-- DietLens — bowl + loupe mark. Stroke-based, currentColor. 512×512 viewBox. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!--
+    Bowl: a shallow ramen/skillet bowl viewed at a gentle 3/4 tilt.
+    Drawn as:
+      - an elliptical rim (top opening)
+      - two curved sides tapering to a flat base arc
+      - a thin footing ellipse at the bottom
+    Magnifier/loupe: positioned overlapping the right rim so the lens
+    ring crosses the bowl edge — the handle extends outside the bowl
+    silhouette, giving depth. The lens circle is slightly thicker stroke
+    weight than the bowl to create visual hierarchy.
+  -->
+
+  <!-- ── BOWL ────────────────────────────────────────────────── -->
+  <!-- Rim ellipse — the top opening of the bowl -->
+  <ellipse
+    cx="246"
+    cy="210"
+    rx="162"
+    ry="44"
+    stroke="currentColor"
+    stroke-width="14"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Left side wall — curves from rim down to base -->
+  <path
+    d="M 84 210 C 72 270, 90 330, 130 356"
+    stroke="currentColor"
+    stroke-width="14"
+    stroke-linecap="round"
+    fill="none"
+  />
+
+  <!-- Right side wall — curves from rim down to base -->
+  <path
+    d="M 408 210 C 420 270, 402 330, 362 356"
+    stroke="currentColor"
+    stroke-width="14"
+    stroke-linecap="round"
+    fill="none"
+  />
+
+  <!-- Base arc — connects the two side walls at the bottom of the bowl -->
+  <path
+    d="M 130 356 Q 246 392 362 356"
+    stroke="currentColor"
+    stroke-width="14"
+    stroke-linecap="round"
+    fill="none"
+  />
+
+  <!-- Footing — small ellipse at the very bottom (the foot ring of the bowl) -->
+  <ellipse
+    cx="246"
+    cy="372"
+    rx="52"
+    ry="13"
+    stroke="currentColor"
+    stroke-width="10"
+    stroke-linecap="round"
+  />
+
+  <!-- Bowl interior suggestion — a subtle inner ellipse at the liquid surface -->
+  <ellipse
+    cx="246"
+    cy="240"
+    rx="108"
+    ry="28"
+    stroke="currentColor"
+    stroke-width="6"
+    stroke-linecap="round"
+    stroke-dasharray="6 10"
+    opacity="0.45"
+  />
+
+  <!-- ── MAGNIFIER / LOUPE ──────────────────────────────────── -->
+  <!--
+    Lens ring: centered at (370, 180), radius 72px.
+    Intentionally overlaps the right rim of the bowl to "examine" its contents.
+    Stroke-width 18 — heavier than bowl lines so the loupe reads as a separate,
+    foreground object (hierarchy through weight, not color).
+  -->
+  <circle
+    cx="370"
+    cy="178"
+    r="72"
+    stroke="currentColor"
+    stroke-width="18"
+    stroke-linecap="round"
+  />
+
+  <!--
+    Inner lens highlight — concentric circle, thinner, at about 80% of lens radius.
+    Suggests the glass inside the loupe frame.
+  -->
+  <circle
+    cx="370"
+    cy="178"
+    r="50"
+    stroke="currentColor"
+    stroke-width="5"
+    stroke-linecap="round"
+    opacity="0.35"
+  />
+
+  <!--
+    Handle: extends from the lower-right of the lens ring outward and downward,
+    angled at roughly 135° (lower-right direction). The handle tip exits the bowl
+    silhouette entirely, reinforcing depth — the loupe is held above/in front.
+    Start point: on the lens ring circumference at ~135° from top
+    (~370 + 72*sin(135°), ~178 + 72*cos(135°)) ≈ (421, 229)
+    End point: further along the same angle
+  -->
+  <line
+    x1="421"
+    y1="229"
+    x2="462"
+    y2="285"
+    stroke="currentColor"
+    stroke-width="18"
+    stroke-linecap="round"
+  />
+
+  <!-- Handle grip notch — a short perpendicular tick near the end of the handle -->
+  <line
+    x1="450"
+    y1="268"
+    x2="476"
+    y2="300"
+    stroke="currentColor"
+    stroke-width="12"
+    stroke-linecap="round"
+    opacity="0.5"
+  />
+
+</svg>
