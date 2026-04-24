@@ -140,14 +140,14 @@ export function Fab({ onCategorySelected }: FabProps) {
   return (
     <>
       {/*
-        Hidden file input — accept images, prefer rear camera (capture="environment").
-        Kept in the DOM but never visible.
+        Hidden file input — accepts any image. Without `capture`, mobile browsers
+        show a native picker offering BOTH the camera and the photo library, so
+        the user can choose whichever is handier. Kept in the DOM but never visible.
       */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         style={{ position: "absolute", width: 0, height: 0, opacity: 0, pointerEvents: "none" }}
         tabIndex={-1}
         aria-hidden="true"
