@@ -125,33 +125,41 @@ export default function TodayPage() {
     endOfToday.setHours(23, 59, 59, 999);
 
     const supabase = getSupabaseBrowserClient();
+    let cancelled = false;
 
-    supabase
-      .from("meals")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .gte("created_at", startOfToday.toISOString())
-      .lte("created_at", endOfToday.toISOString())
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("meals")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .gte("created_at", startOfToday.toISOString())
+          .lte("created_at", endOfToday.toISOString())
+          .order("created_at", { ascending: false });
+        if (cancelled) return;
         if (error) {
           setQueryError(error as unknown as Error);
         } else {
           setMeals(data ?? []);
           setQueryError(null);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
+        if (cancelled) return;
         // Network-level failure (TypeError: Failed to fetch) — treat as
-        // transient offline rather than a hard error. The offline banner
-        // already tells the user what's up.
+        // transient offline rather than a hard error. The banner already
+        // explains what's up.
         if (err instanceof TypeError && err.message.includes("fetch")) {
           setMeals((prev) => prev ?? []);
           setQueryError(null);
         } else {
           setQueryError(err as Error);
         }
-      });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [session, retryKey]);
 
   // Re-run the query automatically when the browser comes back online.

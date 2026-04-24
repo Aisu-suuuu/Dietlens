@@ -212,29 +212,37 @@ export default function AlbumDetailPage() {
     }
 
     const supabase = getSupabaseBrowserClient();
+    let cancelled = false;
 
-    supabase
-      .from("meals")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .eq("category", category)
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("meals")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .eq("category", category)
+          .order("created_at", { ascending: false });
+        if (cancelled) return;
         if (error) {
           setQueryError(error as unknown as Error);
         } else {
           setMeals(data ?? []);
           setQueryError(null);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
+        if (cancelled) return;
         if (err instanceof TypeError && err.message.includes("fetch")) {
           setMeals((prev) => prev ?? []);
           setQueryError(null);
         } else {
           setQueryError(err as Error);
         }
-      });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [session, category]);
 
   // ── meal:created — optimistically prepend if category matches ────────────
