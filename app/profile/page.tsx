@@ -409,6 +409,8 @@ function EmailView({ userId, email }: { userId: string; email: string | null }) 
         {email ?? "(no email)"}
       </p>
 
+      <InviteForm />
+
       <FollowLists userId={userId} />
 
       <button
@@ -432,6 +434,134 @@ function EmailView({ userId, email }: { userId: string; email: string | null }) 
 
       <UserIdFooter userId={userId} />
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// InviteForm — POST /api/invites + render the magic-link confirmation.
+// Visible only on the EmailView; the API rejects anon callers.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function InviteForm() {
+  const [emailInput, setEmailInput] = useState("");
+  const [inflight, setInflight] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (inflight) return;
+    const trimmed = emailInput.trim();
+    if (!trimmed || !trimmed.includes("@")) {
+      showToast({ message: "Enter a valid email address", icon: "error" });
+      return;
+    }
+    setInflight(true);
+    try {
+      const res = await fetch("/api/invites", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error ?? `Invite failed (${res.status})`);
+      }
+      setSentTo(trimmed);
+      setEmailInput("");
+    } catch (err) {
+      console.error("[InviteForm] failed:", err);
+      const msg = err instanceof Error ? err.message : "Couldn't send the invite";
+      showToast({ message: msg, icon: "error", duration: 4500 });
+    } finally {
+      setInflight(false);
+    }
+  }
+
+  return (
+    <section style={{ marginTop: "var(--space-shelf)" }}>
+      <h2
+        style={{
+          color: "var(--fg-smoke)",
+          fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+          fontVariationSettings: '"opsz" 11, "SOFT" 100, "wght" 400',
+          fontSize: "11px",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          margin: 0,
+          marginBottom: "var(--space-bite)",
+        }}
+      >
+        Invite a friend
+      </h2>
+
+      {sentTo && (
+        <p
+          style={{
+            color: "var(--fg-crema)",
+            fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+            fontVariationSettings: '"opsz" 11, "SOFT" 100, "wght" 400',
+            fontSize: "13px",
+            lineHeight: 1.6,
+            margin: 0,
+            marginBottom: "var(--space-bite)",
+          }}
+        >
+          Sent to <strong style={{ fontWeight: 500 }}>{sentTo}</strong>. They'll be
+          following you (and you'll be following them) once they accept.
+        </p>
+      )}
+
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", gap: "var(--space-bite)", flexWrap: "wrap" }}
+      >
+        <input
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          autoCapitalize="off"
+          autoCorrect="off"
+          placeholder="friend@example.com"
+          value={emailInput}
+          onChange={(e) => setEmailInput(e.target.value)}
+          disabled={inflight}
+          aria-label="Friend's email address"
+          style={{
+            flex: "1 1 200px",
+            minWidth: 0,
+            padding: "10px 12px",
+            background: "var(--bg-ember-black)",
+            border: "1px solid var(--border-crumb)",
+            borderRadius: "var(--radius-knob)",
+            color: "var(--fg-crema)",
+            fontFamily:
+              "var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif",
+            fontSize: "14px",
+            outline: "none",
+          }}
+        />
+        <button
+          type="submit"
+          disabled={inflight}
+          style={{
+            padding: "10px 16px",
+            background: "var(--safelight, #E07B3A)",
+            border: "none",
+            borderRadius: "var(--radius-knob)",
+            color: "var(--bg-cast-iron)",
+            fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+            fontVariationSettings: '"opsz" 24, "SOFT" 50, "wght" 600',
+            fontSize: "14px",
+            cursor: inflight ? "wait" : "pointer",
+            opacity: inflight ? 0.6 : 1,
+            transition: "opacity var(--dur-fast) var(--ease-out)",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          {inflight ? "Sending…" : "Send invite"}
+        </button>
+      </form>
+    </section>
   );
 }
 
