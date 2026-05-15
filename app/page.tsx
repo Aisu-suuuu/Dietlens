@@ -111,14 +111,10 @@ export default function TodayPage() {
   useEffect(() => {
     if (!session) return;
 
-    // If the browser is offline, don't attempt the fetch — show empty feed so
-    // the offline banner + capture flow stay usable. Queued meals still render
-    // via the meal:created event path.
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setMeals((prev) => prev ?? []);
-      setQueryError(null);
-      return;
-    }
+    // Note: we no longer short-circuit on navigator.onLine. iOS PWA cold-
+    // starts often report onLine=false even though the network is fine, and
+    // the try/catch below already handles a genuine "Failed to fetch" by
+    // falling back to the cached/empty feed.
 
     // ── Today filter in LOCAL timezone ───────────────────────────────────────
     const startOfToday = new Date();

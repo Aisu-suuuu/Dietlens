@@ -116,6 +116,38 @@ export function useQueueState(): QueueState {
     return () => clearInterval(id);
   }, [online, refreshLength]);
 
+  // ── iOS PWA connectivity probe ───────────────────────────────────────────
+  // navigator.onLine is unreliable on iOS Safari and installed PWAs: it can
+  // start as `false` even when network is fine, and the `online` event may
+  // not fire until the user navigates. We periodically HEAD a lightweight
+  // resource while we believe we're offline; if it succeeds, we know we're
+  // actually online and flip the state ourselves.
+  useEffect(() => {
+    if (online) return;
+
+    let cancelled = false;
+    const probe = async () => {
+      try {
+        // Cache-bust the SW so the request actually hits the network.
+        const res = await fetch(`/favicon.ico?probe=${Date.now()}`, {
+          method: "HEAD",
+          cache: "no-store",
+        });
+        if (!cancelled && res.ok) setOnline(true);
+      } catch {
+        // Genuinely offline — leave state as-is.
+      }
+    };
+
+    // First probe runs immediately, then every 4s while still flagged offline.
+    void probe();
+    const id = setInterval(probe, 4_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [online]);
+
   const syncing = online && queueLength > 0;
   return { online, queueLength, syncing };
 }

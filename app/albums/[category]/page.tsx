@@ -205,11 +205,8 @@ export default function AlbumDetailPage() {
   useEffect(() => {
     if (!session) return;
 
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setMeals((prev) => prev ?? []);
-      setQueryError(null);
-      return;
-    }
+    // No short-circuit on navigator.onLine — see /app/page.tsx for context.
+    // Try/catch below handles genuine network failures.
 
     const supabase = getSupabaseBrowserClient();
     let cancelled = false;
