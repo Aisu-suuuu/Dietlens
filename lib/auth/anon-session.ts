@@ -72,6 +72,38 @@ export interface AnonSessionState {
   loading: boolean;
   error: Error | null;
   userId: string | null;
+  /**
+   * Email address attached to the user, if they've upgraded from anonymous
+   * to email (Wave 2). Null for anonymous users and during initial load.
+   */
+  email: string | null;
+  /**
+   * True when the user is still in the anonymous-only flow. Becomes false
+   * after a successful `updateUser({ email })` → magic-link confirmation,
+   * at which point `email` is populated.
+   *
+   * Derived from `session.user.is_anonymous` which Supabase sets to true
+   * for sessions created via signInAnonymously() and false once an email
+   * identity is linked.
+   */
+  isAnonymous: boolean;
+}
+
+/**
+ * Internal helper — pulls email + isAnonymous off a Supabase session.
+ * Centralised so the bootstrap path and the onAuthStateChange callback
+ * stay aligned.
+ */
+function deriveSessionFlags(
+  session: Session | null
+): Pick<AnonSessionState, "email" | "isAnonymous"> {
+  const user = session?.user;
+  return {
+    email: user?.email ?? null,
+    // user.is_anonymous is true for signInAnonymously() sessions and false
+    // once linkIdentity / updateUser({ email }) flips them.
+    isAnonymous: user?.is_anonymous ?? false,
+  };
 }
 
 /**
@@ -92,6 +124,8 @@ export function useAnonSession(): AnonSessionState {
     loading: true,
     error: null,
     userId: null,
+    email: null,
+    isAnonymous: false,
   });
 
   // Stable ref so the auth state change listener always sees the latest state
@@ -116,6 +150,8 @@ export function useAnonSession(): AnonSessionState {
               "Some features may be unavailable."
           ),
           userId: null,
+          email: null,
+          isAnonymous: false,
         });
       }
     }, 10_000);
@@ -132,6 +168,7 @@ export function useAnonSession(): AnonSessionState {
         loading: false,
         error: null,
         userId: session?.user?.id ?? null,
+        ...deriveSessionFlags(session),
       });
     });
 
@@ -148,6 +185,7 @@ export function useAnonSession(): AnonSessionState {
             loading: false,
             error: null,
             userId: session.user?.id ?? null,
+            ...deriveSessionFlags(session),
           });
         }
       })
@@ -160,6 +198,8 @@ export function useAnonSession(): AnonSessionState {
           loading: false,
           error,
           userId: null,
+          email: null,
+          isAnonymous: false,
         });
       });
 
