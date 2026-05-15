@@ -19,12 +19,13 @@
  * Wave 4 will add an Invite-a-friend form.
  */
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAnonSession } from "@/lib/auth/anon-session";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { showToast } from "@/components/toast";
+import { MonogramAvatar } from "@/components/monogram-avatar";
 
 /**
  * Tiny inner component whose only job is to read ?auth_error= from the URL
@@ -363,6 +364,7 @@ function AnonymousView({ userId }: { userId: string }) {
 function EmailView({ userId, email }: { userId: string; email: string | null }) {
   const [signingOut, setSigningOut] = useState(false);
   const router = useRouter();
+  const [displayName, setDisplayName] = useState<string | null>(null);
 
   async function handleSignOut() {
     if (signingOut) return;
@@ -380,34 +382,35 @@ function EmailView({ userId, email }: { userId: string; email: string | null }) 
 
   return (
     <div style={{ paddingTop: "var(--space-shelf)" }}>
-      <p
+      {/* Avatar + editable name + email cluster */}
+      <div
         style={{
-          color: "var(--fg-smoke)",
-          fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
-          fontVariationSettings: '"opsz" 11, "SOFT" 100, "wght" 400',
-          fontSize: "11px",
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          margin: 0,
-          marginBottom: "var(--space-bite)",
-        }}
-      >
-        Signed in as
-      </p>
-      <p
-        style={{
-          color: "var(--fg-crema)",
-          fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
-          fontVariationSettings: '"opsz" 24, "SOFT" 50, "wght" 500',
-          fontSize: "18px",
-          lineHeight: 1.3,
-          margin: 0,
+          display: "flex",
+          gap: "var(--space-plate)",
+          alignItems: "center",
           marginBottom: "var(--space-shelf)",
-          wordBreak: "break-all",
         }}
       >
-        {email ?? "(no email)"}
-      </p>
+        <MonogramAvatar seed={userId} displayName={displayName} size={64} />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <DisplayNameField userId={userId} onChange={setDisplayName} />
+          <p
+            style={{
+              color: "var(--fg-smoke)",
+              fontFamily:
+                "var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif",
+              fontSize: "12px",
+              margin: 0,
+              marginTop: "var(--space-crumb)",
+              wordBreak: "break-all",
+            }}
+          >
+            {email ?? "(no email)"}
+          </p>
+        </div>
+      </div>
+
+      <ProfileStats userId={userId} />
 
       <InviteForm />
 
@@ -433,6 +436,243 @@ function EmailView({ userId, email }: { userId: string; email: string | null }) 
       </button>
 
       <UserIdFooter userId={userId} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DisplayNameField — editable name with save-on-blur. Reads/writes
+// public.profiles.display_name. Calls onChange whenever the saved value
+// shifts so the parent can pass it into the avatar.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DisplayNameField({
+  userId,
+  onChange,
+}: {
+  userId: string;
+  onChange?: (name: string | null) => void;
+}) {
+  const [value, setValue] = useState<string>("");
+  const [savedValue, setSavedValue] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load current value.
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = getSupabaseBrowserClient();
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", userId)
+        .maybeSingle();
+      if (cancelled) return;
+      const name = (data?.display_name as string | null) ?? null;
+      setSavedValue(name);
+      setValue(name ?? "");
+      setLoaded(true);
+      onChange?.(name);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, onChange]);
+
+  async function commit() {
+    const trimmed = value.trim();
+    const next = trimmed === "" ? null : trimmed;
+    if (next === savedValue) return; // no-op
+    setSaving(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error } = await supabase
+        .from("profiles")
+        .update({ display_name: next })
+        .eq("id", userId);
+      if (error) throw error;
+      setSavedValue(next);
+      onChange?.(next);
+    } catch (err) {
+      console.error("[DisplayNameField] save failed:", err);
+      showToast({ message: "Couldn't save name — try again", icon: "error" });
+      setValue(savedValue ?? "");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            inputRef.current?.blur();
+          }
+          if (e.key === "Escape") {
+            e.preventDefault();
+            setValue(savedValue ?? "");
+            inputRef.current?.blur();
+          }
+        }}
+        placeholder={loaded ? "Add your name" : "…"}
+        disabled={!loaded || saving}
+        aria-label="Display name"
+        style={{
+          width: "100%",
+          padding: "2px 0",
+          background: "transparent",
+          border: "none",
+          borderBottom: "1px dashed transparent",
+          color: "var(--fg-crema)",
+          fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+          fontVariationSettings: '"opsz" 24, "SOFT" 50, "wght" 500',
+          fontSize: "20px",
+          lineHeight: 1.2,
+          outline: "none",
+          letterSpacing: "var(--tracking-tight)",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderBottomColor = "var(--border-crumb)";
+        }}
+        onBlurCapture={(e) => {
+          e.currentTarget.style.borderBottomColor = "transparent";
+        }}
+      />
+      {saving && (
+        <span
+          style={{
+            position: "absolute",
+            right: 0,
+            top: "calc(50% - 6px)",
+            color: "var(--fg-smoke)",
+            fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+            fontVariationSettings: '"opsz" 11, "SOFT" 100, "wght" 400',
+            fontSize: "10px",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            opacity: 0.7,
+          }}
+        >
+          Saving…
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ProfileStats — four-cell stats row (meals / photos / followers / following).
+// Each cell fetches its own count in parallel; cells render skeletons until
+// their query resolves.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface Stats {
+  meals: number | null;
+  photos: number | null;
+  followers: number | null;
+  following: number | null;
+}
+
+function ProfileStats({ userId }: { userId: string }) {
+  const [stats, setStats] = useState<Stats>({
+    meals: null,
+    photos: null,
+    followers: null,
+    following: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = getSupabaseBrowserClient();
+
+    (async () => {
+      const [mealsRes, photosRes, followersRes, followingRes] = await Promise.all([
+        supabase
+          .from("meals")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", userId),
+        supabase
+          .from("meal_photos")
+          .select("meals!inner(user_id)", { count: "exact", head: true })
+          .eq("meals.user_id", userId),
+        supabase
+          .from("follows")
+          .select("*", { count: "exact", head: true })
+          .eq("followee_id", userId),
+        supabase
+          .from("follows")
+          .select("*", { count: "exact", head: true })
+          .eq("follower_id", userId),
+      ]);
+      if (cancelled) return;
+      setStats({
+        meals: mealsRes.count ?? 0,
+        photos: photosRes.count ?? 0,
+        followers: followersRes.count ?? 0,
+        following: followingRes.count ?? 0,
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
+        gap: "var(--space-bite)",
+        padding: "var(--space-plate) 0",
+        borderTop: "1px solid var(--border-crumb)",
+        borderBottom: "1px solid var(--border-crumb)",
+        marginBottom: "var(--space-shelf)",
+      }}
+    >
+      <StatCell label="Meals" value={stats.meals} />
+      <StatCell label="Photos" value={stats.photos} />
+      <StatCell label="Followers" value={stats.followers} />
+      <StatCell label="Following" value={stats.following} />
+    </div>
+  );
+}
+
+function StatCell({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+      <span
+        style={{
+          color: "var(--fg-crema)",
+          fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+          fontVariationSettings: '"opsz" 24, "SOFT" 50, "wght" 500',
+          fontFeatureSettings: '"tnum"',
+          fontSize: "18px",
+          lineHeight: 1,
+        }}
+      >
+        {value === null ? "—" : value}
+      </span>
+      <span
+        style={{
+          color: "var(--fg-smoke)",
+          fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+          fontVariationSettings: '"opsz" 11, "SOFT" 100, "wght" 400',
+          fontSize: "10px",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </span>
     </div>
   );
 }

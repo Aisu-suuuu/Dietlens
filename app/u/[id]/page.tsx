@@ -28,6 +28,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { MealWithPhotos } from "@/lib/supabase/types";
 import { MealCard } from "@/components/meal-card";
 import { FollowButton } from "@/components/follow-button";
+import { MonogramAvatar } from "@/components/monogram-avatar";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -199,20 +200,36 @@ export default function PublicProfilePage() {
           paddingBottom: "var(--space-shelf)",
         }}
       >
-        <h1
+        <div
           style={{
-            fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
-            fontVariationSettings: '"opsz" 144, "SOFT" 100, "wght" 500',
-            fontSize: "clamp(26px, 7vw, 34px)",
-            letterSpacing: "var(--tracking-tight)",
-            lineHeight: 1.15,
-            color: "var(--fg-crema)",
-            margin: 0,
-            wordBreak: "break-word",
+            display: "flex",
+            gap: "var(--space-plate)",
+            alignItems: "center",
+            marginBottom: "var(--space-bite)",
           }}
         >
-          {headline}
-        </h1>
+          <MonogramAvatar
+            seed={targetUserId}
+            displayName={profile?.displayName ?? null}
+            size={56}
+          />
+          <h1
+            style={{
+              fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+              fontVariationSettings: '"opsz" 144, "SOFT" 100, "wght" 500',
+              fontSize: "clamp(24px, 6.5vw, 30px)",
+              letterSpacing: "var(--tracking-tight)",
+              lineHeight: 1.15,
+              color: "var(--fg-crema)",
+              margin: 0,
+              wordBreak: "break-word",
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            {headline}
+          </h1>
+        </div>
 
         {/* Counts row */}
         {profile && (
