@@ -22,7 +22,7 @@ import Link from "next/link";
 import { useAnonSession } from "@/lib/auth/anon-session";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CATEGORIES, type Category } from "@/lib/supabase/types";
-import type { MealRow } from "@/lib/supabase/types";
+import type { MealPhotoRow, MealRow, MealWithPhotos } from "@/lib/supabase/types";
 import type { CaptureResult } from "@/lib/upload/capture";
 import { MealCard } from "@/components/meal-card";
 
@@ -193,7 +193,7 @@ export default function AlbumDetailPage() {
   }
 
   const { session, loading: sessionLoading, error: sessionError } = useAnonSession();
-  const [meals, setMeals] = useState<MealRow[] | null>(null);
+  const [meals, setMeals] = useState<MealWithPhotos[] | null>(null);
   const [queryError, setQueryError] = useState<Error | null>(null);
 
   // Stable ref: needed so the event listener always sees current session
@@ -218,7 +218,7 @@ export default function AlbumDetailPage() {
       try {
         const { data, error } = await supabase
           .from("meals")
-          .select("*")
+          .select("*, photos:meal_photos(id, meal_id, image_path, position, created_at)")
           .eq("user_id", session.user.id)
           .eq("category", category)
           .order("created_at", { ascending: false });
@@ -226,7 +226,7 @@ export default function AlbumDetailPage() {
         if (error) {
           setQueryError(error as unknown as Error);
         } else {
-          setMeals(data ?? []);
+          setMeals((data ?? []) as MealWithPhotos[]);
           setQueryError(null);
         }
       } catch (err) {
@@ -253,12 +253,13 @@ export default function AlbumDetailPage() {
       // Only prepend if the new meal belongs to this album
       if (detail.category !== category) return;
 
-      const newMeal: MealRow = {
+      const newMeal: MealWithPhotos = {
         id: detail.mealId,
         user_id: sessionRef.current?.user?.id ?? "",
         image_path: detail.imagePath,
         category: detail.category,
         created_at: detail.createdAt,
+        photos: detail.photos ?? [],
       };
 
       setMeals((prev) => (prev ? [newMeal, ...prev] : [newMeal]));
@@ -312,6 +313,7 @@ export default function AlbumDetailPage() {
         path: string;
         createdAt: string;
         category: Category;
+        photos: MealPhotoRow[];
       }>).detail;
       if (!detail?.localId || !detail?.mealId) return;
 
@@ -332,6 +334,7 @@ export default function AlbumDetailPage() {
                 image_path: detail.path,
                 category: detail.category,
                 created_at: detail.createdAt,
+                photos: detail.photos ?? m.photos,
               }
             : m
         );

@@ -27,15 +27,44 @@ export interface MealRow {
   /** References auth.users(id) — anonymous user's UID */
   user_id: string;
   /**
-   * Storage object path within the `meal-photos` bucket.
-   * Format: "<user_id>/<timestamp>.jpg"
-   * NOT a URL — use supabase.storage.from('meal-photos').createSignedUrl() to get one.
+   * Cover photo storage path within the `meal-photos` bucket. Always equals
+   * the position-0 entry in `meal_photos`. Kept on the parent row so the
+   * Albums grid can render a thumbnail without joining meal_photos.
+   *
+   * Nullable since the 0002_multi_photo migration; legacy single-photo
+   * meals are backfilled into meal_photos and continue to populate this.
+   * NOT a URL — use supabase.storage.from('meal-photos').createSignedUrl().
    */
-  image_path: string;
+  image_path: string | null;
   /** Meal time category */
   category: Category;
   /** ISO 8601 timestamp — default now() */
   created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// public.meal_photos row — one per photo, many per meal (Wave 1)
+// ---------------------------------------------------------------------------
+export interface MealPhotoRow {
+  /** UUID primary key */
+  id: string;
+  /** FK → meals.id, cascades on parent delete */
+  meal_id: string;
+  /** Storage path in the `meal-photos` bucket, same format as MealRow.image_path */
+  image_path: string;
+  /** 0-based carousel order. Position 0 is the cover. */
+  position: number;
+  /** ISO 8601 timestamp — default now() */
+  created_at: string;
+}
+
+/**
+ * Convenience composite — a meal with its photos eagerly loaded via the
+ * Supabase nested-select syntax: `.select("*, photos:meal_photos(*)")`.
+ * Photos arrive unsorted from PostgREST; consumers should sort by `position`.
+ */
+export interface MealWithPhotos extends MealRow {
+  photos: MealPhotoRow[];
 }
 
 // ---------------------------------------------------------------------------

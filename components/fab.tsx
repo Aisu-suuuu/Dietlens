@@ -83,17 +83,18 @@ export function Fab({ onCategorySelected }: FabProps) {
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+      const fileList = e.target.files;
+      const files = fileList ? Array.from(fileList) : [];
 
       // ── User cancelled the picker — silent, do nothing ───────────────────
-      if (!file) return;
+      if (!files.length) return;
 
-      // Reset the input so the same file can be selected again later
+      // Reset the input so the same selection can be made again later
       e.target.value = "";
 
       const category = pendingCategoryRef.current;
       if (!category) {
-        console.error("[Fab] file selected but no pending category");
+        console.error("[Fab] files selected but no pending category");
         return;
       }
 
@@ -104,13 +105,27 @@ export function Fab({ onCategorySelected }: FabProps) {
 
       setUploading(true);
 
+      // Soft heads-up for large batches — no hard cap, but compression and
+      // upload time scale linearly and silence is unkind past ~10 photos.
+      if (files.length >= 10) {
+        showToast({
+          message: `Logging ${files.length} photos — this may take a moment`,
+          duration: 3000,
+        });
+      }
+
       try {
         const supabase = getSupabaseBrowserClient();
-        const result = await captureAndUploadMeal({ file, category, userId, supabase });
+        const result = await captureAndUploadMeal({ files, category, userId, supabase });
 
         // ── Success ─────────────────────────────────────────────────────────
         navigator.vibrate?.(50);
-        showToast({ message: `Logged to ${result.category}`, icon: "check" });
+        const photoSuffix =
+          result.photos.length > 1 ? ` · ${result.photos.length} photos` : "";
+        showToast({
+          message: `Logged to ${result.category}${photoSuffix}`,
+          icon: "check",
+        });
 
         // Dispatch window event so the dashboard can prepend the new meal
         window.dispatchEvent(
@@ -148,6 +163,7 @@ export function Fab({ onCategorySelected }: FabProps) {
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        multiple
         style={{ position: "absolute", width: 0, height: 0, opacity: 0, pointerEvents: "none" }}
         tabIndex={-1}
         aria-hidden="true"

@@ -31,8 +31,12 @@ export interface QueuedMeal {
   localId: string;
   userId: string;
   category: Category;
-  /** The compressed JPEG blob produced by `compressImage` */
-  blob: Blob;
+  /**
+   * One or more compressed JPEG blobs produced by `compressImage`.
+   * Order is preserved — index 0 becomes the meal's cover photo.
+   * (DB schema v2 added the array; v1's single `blob` field is migrated.)
+   */
+  blobs: Blob[];
   /** ISO 8601 timestamp assigned when this entry was enqueued */
   createdAt: string;
   /** Number of sync attempts so far — used for retry cap */
@@ -41,10 +45,21 @@ export interface QueuedMeal {
   lastAttemptAt: string | null;
 }
 
+/** Internal shape of a v1 queue entry — kept only for the upgrade path. */
+interface QueuedMealV1 {
+  localId: string;
+  userId: string;
+  category: Category;
+  blob: Blob;
+  createdAt: string;
+  attempts: number;
+  lastAttemptAt: string | null;
+}
+
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const DB_NAME = "dietlens";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "meals_queue";
 
 /**
@@ -83,14 +98,52 @@ export function initQueueDb(): Promise<IDBDatabase> {
   _dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
 
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
+      const oldVersion = event.oldVersion;
+
+      // v0 → v1: create the store. Fresh installs land here.
+      if (oldVersion < 1) {
         // keyPath "localId" makes get/put/delete keyless — the entry carries
         // its own id. An index on createdAt would speed up FIFO reads on
         // very large queues, but the realistic N is <100 so a full scan +
         // JS sort is simpler and avoids the index maintenance overhead.
         db.createObjectStore(STORE_NAME, { keyPath: "localId" });
+      }
+
+      // v1 → v2: migrate single `blob` field to `blobs: Blob[]`.
+      // Wave 1 (multi-photo per meal) introduced the array. We need this
+      // upgrade path so users who took photos offline before the rollout
+      // don't lose them on next open.
+      if (oldVersion < 2 && oldVersion >= 1) {
+        // Reuse the versionchange transaction implicitly provided to
+        // upgrade requests. openCursor below runs within it.
+        const tx = req.transaction;
+        if (!tx) return;
+        const store = tx.objectStore(STORE_NAME);
+        const cursorReq = store.openCursor();
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (!cursor) return;
+          const v1 = cursor.value as QueuedMealV1;
+          // Some defensive copies — even though v1 entries should all have
+          // `blob`, an interrupted migration could leave a partial shape.
+          if (v1 && (v1 as unknown as QueuedMeal).blobs) {
+            cursor.continue();
+            return;
+          }
+          const upgraded: QueuedMeal = {
+            localId: v1.localId,
+            userId: v1.userId,
+            category: v1.category,
+            blobs: v1.blob ? [v1.blob] : [],
+            createdAt: v1.createdAt,
+            attempts: v1.attempts ?? 0,
+            lastAttemptAt: v1.lastAttemptAt ?? null,
+          };
+          cursor.update(upgraded);
+          cursor.continue();
+        };
       }
     };
 

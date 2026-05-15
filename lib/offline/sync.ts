@@ -27,7 +27,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Category } from "@/lib/supabase/types";
+import type { Category, MealPhotoRow } from "@/lib/supabase/types";
 import {
   listQueue,
   removeFromQueue,
@@ -136,31 +136,48 @@ async function syncOne(
   supabase: SupabaseClient,
   entry: QueuedMeal
 ): Promise<SyncOutcome> {
-  // Generate a fresh storage path on each attempt. Retrying with the same
-  // path would collide with an earlier partial upload (upsert is disabled
-  // by the RLS policy on `meal-photos`), and paths are cheap.
-  const imagePath = generateImagePath(entry.userId);
+  if (!entry.blobs?.length) {
+    // Empty queue entries shouldn't exist but guard against IDB corruption —
+    // drop the entry rather than retry forever.
+    await removeFromQueue(entry.localId).catch(() => {});
+    return "success";
+  }
 
-  // ── Upload blob ─────────────────────────────────────────────────────────────
-  const { error: uploadError } = await supabase.storage
-    .from("meal-photos")
-    .upload(imagePath, entry.blob, {
-      contentType: "image/jpeg",
-      upsert: false,
-    });
+  // Fresh paths every attempt — retrying with the same path collides with
+  // any partial upload from a previous attempt (storage policy disallows upsert).
+  const imagePaths = entry.blobs.map(() => generateImagePath(entry.userId));
 
-  if (uploadError) {
+  // ── Upload all blobs in parallel ───────────────────────────────────────────
+  // If any upload fails, clean up the ones that succeeded so the next retry
+  // starts from a clean slate.
+  const uploaded: string[] = [];
+  try {
+    await Promise.all(
+      entry.blobs.map(async (blob, i) => {
+        const { error } = await supabase.storage
+          .from("meal-photos")
+          .upload(imagePaths[i], blob, {
+            contentType: "image/jpeg",
+            upsert: false,
+          });
+        if (error) throw error;
+        uploaded.push(imagePaths[i]);
+      })
+    );
+  } catch {
+    if (uploaded.length) {
+      await supabase.storage.from("meal-photos").remove(uploaded).catch(() => {});
+    }
     return "upload-failed";
   }
 
-  // ── Insert row ──────────────────────────────────────────────────────────────
-  // If this fails (RLS mismatch, column rename, etc.) we clean up the orphan
-  // storage object so a retry from the top isn't blocked by a stale upload.
+  // ── Insert parent meal row ──────────────────────────────────────────────────
+  const coverPath = imagePaths[0];
   const { data: inserted, error: insertError } = await supabase
     .from("meals")
     .insert({
       user_id: entry.userId,
-      image_path: imagePath,
+      image_path: coverPath,
       category: entry.category,
       // Preserve the user's local capture time — otherwise every meal synced
       // after a long offline gap would collapse to "right now" in the feed.
@@ -170,37 +187,60 @@ async function syncOne(
     .single();
 
   if (insertError || !inserted) {
-    await supabase.storage
-      .from("meal-photos")
-      .remove([imagePath])
-      .catch(() => {
-        // Best-effort cleanup; the orphan is acceptable vs. a hard failure here.
-      });
+    await supabase.storage.from("meal-photos").remove(imagePaths).catch(() => {});
+    return "insert-failed";
+  }
+
+  const mealId = inserted.id as string;
+
+  // ── Insert child meal_photos rows ───────────────────────────────────────────
+  const photoRows = imagePaths.map((path, position) => ({
+    meal_id: mealId,
+    image_path: path,
+    position,
+  }));
+
+  const { data: photoData, error: photoError } = await supabase
+    .from("meal_photos")
+    .insert(photoRows)
+    .select("id, meal_id, image_path, position, created_at");
+
+  if (photoError || !photoData) {
+    // Roll back: cascade-delete via meals row, then clean up the storage objects.
+    // Supabase query builders are PromiseLike, not Promise — `.catch` won't
+    // type-check directly, so wrap in try/catch.
+    try { await supabase.from("meals").delete().eq("id", mealId); } catch {}
+    await supabase.storage.from("meal-photos").remove(imagePaths).catch(() => {});
     return "insert-failed";
   }
 
   // ── Success path ────────────────────────────────────────────────────────────
-  // Only now — after the DB has the row — do we drop the queue entry. If the
-  // tab dies between the insert and this delete, the worst case is one extra
-  // row gets inserted on next sync, which is recoverable (the user can
-  // delete the dupe from MealActions).
+  // Only drop the queue entry after the DB write has fully landed. If the
+  // tab dies between the photo insert and this delete, next sync re-uploads
+  // the blobs and we get a duplicate meal — recoverable via MealActions delete.
   await removeFromQueue(entry.localId);
 
-  // Broadcast so the dashboard + album views can swap the optimistic card.
   if (typeof window !== "undefined") {
     window.dispatchEvent(
-      new CustomEvent<{ localId: string; mealId: string; path: string; createdAt: string; category: Category }>(
-        "meal:synced",
-        {
-          detail: {
-            localId: entry.localId,
-            mealId: inserted.id as string,
-            path: inserted.image_path as string,
-            createdAt: inserted.created_at as string,
-            category: inserted.category as Category,
-          },
-        }
-      )
+      new CustomEvent<{
+        localId: string;
+        mealId: string;
+        path: string;
+        createdAt: string;
+        category: Category;
+        photos: MealPhotoRow[];
+      }>("meal:synced", {
+        detail: {
+          localId: entry.localId,
+          mealId,
+          path: inserted.image_path as string,
+          createdAt: inserted.created_at as string,
+          category: inserted.category as Category,
+          photos: (photoData as MealPhotoRow[])
+            .slice()
+            .sort((a, b) => a.position - b.position),
+        },
+      })
     );
   }
 

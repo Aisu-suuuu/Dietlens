@@ -17,15 +17,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CATEGORIES } from "@/lib/supabase/types";
-import type { Category, MealRow } from "@/lib/supabase/types";
+import type { Category, MealPhotoRow, MealRow } from "@/lib/supabase/types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { deleteMeal, updateMealCategory } from "@/lib/meals/mutations";
 import { showToast } from "@/components/toast";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Accept the base MealRow plus the optional photos array. The carousel-aware
+ * MealCard spreads MealWithPhotos through, but this sheet only cares about
+ * the meal's id, category, and (legacy) image_path for the delete hint.
+ */
 export interface MealActionsProps {
-  meal: MealRow;
+  meal: MealRow & { photos?: MealPhotoRow[] };
   open: boolean;
   onClose: () => void;
 }
@@ -236,7 +241,7 @@ export function MealActions({ meal, open, onClose }: MealActionsProps) {
 // ── MenuView ──────────────────────────────────────────────────────────────────
 
 interface MenuViewProps {
-  meal: MealRow;
+  meal: MealRow & { photos?: MealPhotoRow[] };
   inflight: boolean;
   firstButtonRef: React.RefObject<HTMLButtonElement | null>;
   onMoveClick: () => void;
