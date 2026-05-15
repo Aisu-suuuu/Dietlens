@@ -26,7 +26,7 @@ import Link from "next/link";
 import { useAnonSession } from "@/lib/auth/anon-session";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { MealWithPhotos } from "@/lib/supabase/types";
-import { MealCard } from "@/components/meal-card";
+import { MealTile } from "@/components/meal-tile";
 import { FollowButton } from "@/components/follow-button";
 import { MonogramAvatar } from "@/components/monogram-avatar";
 
@@ -270,24 +270,20 @@ export default function PublicProfilePage() {
       {meals && meals.length === 0 ? (
         <EmptyFeed isFollowing={following === true} isSelf={isSelf} />
       ) : (
-        <ul
-          role="list"
+        <div
           style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--space-shelf)",
+            display: "grid",
+            gridTemplateColumns: "repeat(2, 1fr)",
+            gap: "var(--space-tray)",
+            paddingLeft: "var(--space-counter)",
+            paddingRight: "var(--space-counter)",
             paddingBottom: "var(--space-room)",
           }}
         >
           {(meals ?? []).map((meal) => (
-            <li key={meal.id}>
-              <MealCard meal={meal} />
-            </li>
+            <MealTile key={meal.id} meal={meal} />
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

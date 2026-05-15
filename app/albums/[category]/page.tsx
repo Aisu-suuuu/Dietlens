@@ -24,7 +24,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CATEGORIES, type Category } from "@/lib/supabase/types";
 import type { MealPhotoRow, MealRow, MealWithPhotos } from "@/lib/supabase/types";
 import type { CaptureResult } from "@/lib/upload/capture";
-import { MealCard } from "@/components/meal-card";
+import { MealTile } from "@/components/meal-tile";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -440,25 +440,21 @@ export default function AlbumDetailPage() {
     <div>
       <PageHeader category={category} mealCount={meals?.length ?? null} />
 
-      {/* Vertical newest-first feed — same rhythm as the Today dashboard */}
-      <ul
-        role="list"
+      {/* 2-column grid — same rhythm as the Today dashboard */}
+      <div
         style={{
-          listStyle: "none",
-          margin: 0,
-          padding: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: "var(--space-shelf)",   // 32px — same card-gap as dashboard
-          paddingBottom: "var(--space-room)",  // 40px breathing room above nav
+          display: "grid",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: "var(--space-tray)",
+          paddingLeft: "var(--space-counter)",
+          paddingRight: "var(--space-counter)",
+          paddingBottom: "var(--space-room)",
         }}
       >
         {meals!.map((meal) => (
-          <li key={meal.id}>
-            <MealCard meal={meal} />
-          </li>
+          <MealTile key={meal.id} meal={meal} />
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

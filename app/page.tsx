@@ -5,7 +5,7 @@ import { useAnonSession } from "@/lib/auth/anon-session";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { MealPhotoRow, MealRow, MealWithPhotos } from "@/lib/supabase/types";
 import type { CaptureResult } from "@/lib/upload/capture";
-import { MealCard } from "@/components/meal-card";
+import { MealTile } from "@/components/meal-tile";
 import { EmptyState } from "@/components/empty-state";
 
 // ---------------------------------------------------------------------------
@@ -299,24 +299,21 @@ export default function TodayPage() {
     <div style={{ paddingTop: "env(safe-area-inset-top)" }}>
       <PageHeader />
 
-      {/* Contact-sheet feed — photos edge-to-edge, space-y-8 (32px) rhythm */}
-      <ul
-        role="list"
+      {/* Contact-sheet grid — 2-column 4:5 tiles, tap to open full image */}
+      <div
         style={{
-          listStyle: "none",
-          margin: 0,
-          padding: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: "var(--space-shelf)",  // 32px between cards
+          display: "grid",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: "var(--space-tray)",   // 20px tile gap matches AlbumsPage
+          paddingLeft: "var(--space-counter)",
+          paddingRight: "var(--space-counter)",
+          paddingBottom: "var(--space-room)",
         }}
       >
         {meals!.map((meal) => (
-          <li key={meal.id}>
-            <MealCard meal={meal} />
-          </li>
+          <MealTile key={meal.id} meal={meal} />
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
