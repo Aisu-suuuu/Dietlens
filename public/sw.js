@@ -1,7 +1,7 @@
 // DietLens Service Worker
 // Cache strategy: NetworkFirst for pages, CacheFirst for static assets.
 
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE_SHELL = `dietlens-shell-${VERSION}`;
 const CACHE_STATIC = `dietlens-static-${VERSION}`;
 
