@@ -20,6 +20,7 @@
  */
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAnonSession } from "@/lib/auth/anon-session";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -408,20 +409,7 @@ function EmailView({ userId, email }: { userId: string; email: string | null }) 
         {email ?? "(no email)"}
       </p>
 
-      {/* Wave 3 will slot Following / Followers lists in this gap. */}
-      <p
-        style={{
-          color: "var(--fg-smoke)",
-          fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
-          fontVariationSettings: '"opsz" 11, "SOFT" 100, "wght" 400',
-          fontSize: "13px",
-          lineHeight: 1.6,
-          margin: 0,
-          marginBottom: "var(--space-shelf)",
-        }}
-      >
-        Friends and invites are coming. For now: enjoy your archive.
-      </p>
+      <FollowLists userId={userId} />
 
       <button
         type="button"
@@ -444,6 +432,197 @@ function EmailView({ userId, email }: { userId: string; email: string | null }) 
 
       <UserIdFooter userId={userId} />
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FollowLists — Following + Followers lists rendered as two stacked sections.
+// Each row links to /u/[id]. Empty states nudge toward inviting / sharing.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ListedUser {
+  id: string;
+  displayName: string | null;
+}
+
+function FollowLists({ userId }: { userId: string }) {
+  const [following, setFollowing] = useState<ListedUser[] | null>(null);
+  const [followers, setFollowers] = useState<ListedUser[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = getSupabaseBrowserClient();
+
+    async function load() {
+      // 1. Fetch the two edge sets in parallel.
+      const [followingRes, followersRes] = await Promise.all([
+        supabase.from("follows").select("followee_id").eq("follower_id", userId),
+        supabase.from("follows").select("follower_id").eq("followee_id", userId),
+      ]);
+      if (cancelled) return;
+
+      const followingIds: string[] =
+        (followingRes.data ?? []).map((r: { followee_id: string }) => r.followee_id);
+      const followerIds: string[] =
+        (followersRes.data ?? []).map((r: { follower_id: string }) => r.follower_id);
+
+      // 2. Resolve display names in one query for both lists combined.
+      const allIds = Array.from(new Set([...followingIds, ...followerIds]));
+      const profileMap = new Map<string, string | null>();
+
+      if (allIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, display_name")
+          .in("id", allIds);
+        if (cancelled) return;
+        for (const p of (profilesData ?? []) as { id: string; display_name: string | null }[]) {
+          profileMap.set(p.id, p.display_name);
+        }
+      }
+
+      const mkRow = (id: string): ListedUser => ({
+        id,
+        displayName: profileMap.get(id) ?? null,
+      });
+
+      setFollowing(followingIds.map(mkRow));
+      setFollowers(followerIds.map(mkRow));
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  return (
+    <div style={{ marginBottom: "var(--space-shelf)" }}>
+      <ListSection
+        title="Following"
+        users={following}
+        emptyCopy="You're not following anyone yet. Share your invite link to bring friends in."
+      />
+      <ListSection
+        title="Followers"
+        users={followers}
+        emptyCopy="No followers yet. They'll show up here when they join via your invite."
+      />
+    </div>
+  );
+}
+
+function ListSection({
+  title,
+  users,
+  emptyCopy,
+}: {
+  title: string;
+  users: ListedUser[] | null;
+  emptyCopy: string;
+}) {
+  return (
+    <section style={{ marginTop: "var(--space-shelf)" }}>
+      <h2
+        style={{
+          color: "var(--fg-smoke)",
+          fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+          fontVariationSettings: '"opsz" 11, "SOFT" 100, "wght" 400',
+          fontSize: "11px",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          margin: 0,
+          marginBottom: "var(--space-bite)",
+        }}
+      >
+        {title}
+        {users && (
+          <span
+            style={{
+              opacity: 0.7,
+              marginLeft: "6px",
+              fontFeatureSettings: '"tnum"',
+            }}
+          >
+            {users.length}
+          </span>
+        )}
+      </h2>
+
+      {users === null ? (
+        <p
+          style={{
+            color: "var(--fg-smoke)",
+            opacity: 0.55,
+            fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+            fontVariationSettings: '"opsz" 11, "SOFT" 100, "wght" 400',
+            fontSize: "12px",
+            margin: 0,
+          }}
+        >
+          Developing…
+        </p>
+      ) : users.length === 0 ? (
+        <p
+          style={{
+            color: "var(--fg-smoke)",
+            fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+            fontVariationSettings: '"opsz" 11, "SOFT" 100, "wght" 400',
+            fontSize: "13px",
+            lineHeight: 1.6,
+            margin: 0,
+            maxWidth: "320px",
+          }}
+        >
+          {emptyCopy}
+        </p>
+      ) : (
+        <ul
+          role="list"
+          style={{
+            listStyle: "none",
+            padding: 0,
+            margin: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "2px",
+          }}
+        >
+          {users.map((u) => (
+            <li key={u.id}>
+              <Link
+                href={`/u/${u.id}`}
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: "10px",
+                  padding: "10px 0",
+                  color: "var(--fg-crema)",
+                  textDecoration: "none",
+                  fontFamily: "var(--font-fraunces), ui-serif, Georgia, serif",
+                  fontVariationSettings: '"opsz" 24, "SOFT" 50, "wght" 500',
+                  fontSize: "15px",
+                  borderBottom: "1px solid var(--border-crumb)",
+                }}
+              >
+                <span style={{ flex: 1, wordBreak: "break-word" }}>
+                  {u.displayName ?? <span style={{ opacity: 0.6 }}>Anonymous archive</span>}
+                </span>
+                <span
+                  style={{
+                    color: "var(--fg-smoke)",
+                    fontSize: "11px",
+                    opacity: 0.7,
+                  }}
+                >
+                  ›
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
